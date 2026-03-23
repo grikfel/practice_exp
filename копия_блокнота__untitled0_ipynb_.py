@@ -91,40 +91,26 @@ plt.savefig('data_analysis.png', dpi=300, bbox_inches='tight')
 plt.show()
 
 from transformers import DistilBertTokenizerFast, DistilBertForSequenceClassification
-from torch.utils.data import Dataset, DataLoader
 
-# Загрузка токенизатора и модели
-MODEL_NAME = 'distilbert-base-uncased'
-tokenizer = DistilBertTokenizerFast.from_pretrained(MODEL_NAME)
-model = DistilBertForSequenceClassification.from_pretrained(
-    MODEL_NAME,
-    num_labels=4  # 4 класса для AG News
-)
-
-# Перемещаем модель на GPU если доступен
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model.to(device)
-print(f"Модель загружена и перемещена на: {device}")
-print(f"Архитектура модели:\n{model.config}")
-
+# СОЗДАНИЕ DATASET И DATALOADER
+import torch
 from torch.utils.data import Dataset, DataLoader
 
 class NewsDataset(Dataset):
-    def __init__(self, texts, labels, tokenizer, max_len=256):
+    def __init__(self, texts, labels, tokenizer, max_len=128):
         self.texts = texts
         self.labels = labels
         self.tokenizer = tokenizer
         self.max_len = max_len
-
+    
     def __len__(self):
         return len(self.texts)
-
+    
     def __getitem__(self, idx):
         text = str(self.texts[idx])
         label = self.labels[idx]
-
-        # Токенизация
-        encoding = self.tokenizer.encode_plus(
+      
+        encoding = self.tokenizer(
             text,
             add_special_tokens=True,
             max_length=self.max_len,
@@ -133,7 +119,7 @@ class NewsDataset(Dataset):
             return_attention_mask=True,
             return_tensors='pt'
         )
-
+        
         return {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
@@ -144,28 +130,26 @@ class NewsDataset(Dataset):
 train_dataset = NewsDataset(
     df_train['full_text'].tolist(),
     df_train['label'].tolist(),
-    tokenizer,
-    max_len=128  # Уменьшаем для экономии памяти
+    tokenizer
 )
 
 test_dataset = NewsDataset(
     df_test['full_text'].tolist(),
     df_test['label'].tolist(),
-    tokenizer,
-    max_len=128
+    tokenizer
 )
 
 # Создаем DataLoader'ы
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 train_loader = DataLoader(
-    train_dataset,
+    train_dataset, 
     batch_size=BATCH_SIZE,
     shuffle=True,
     num_workers=2
 )
 
 test_loader = DataLoader(
-    test_dataset,
+    test_dataset, 
     batch_size=BATCH_SIZE,
     shuffle=False,
     num_workers=2
@@ -175,11 +159,10 @@ print(f"Размер обучающей выборки: {len(train_dataset)}")
 print(f"Размер тестовой выборки: {len(test_dataset)}")
 print(f"Количество батчей в train_loader: {len(train_loader)}")
 print(f"Количество батчей в test_loader: {len(test_loader)}")
-print(f"Batch size: {BATCH_SIZE}")
 
-# Проверяем первый батч
+# проверка первого батча 
+print("\nПроверка структуры батча:")
 for batch in train_loader:
-    print("Проверка структуры батча:")
     print(f"  input_ids shape: {batch['input_ids'].shape}")
     print(f"  attention_mask shape: {batch['attention_mask'].shape}")
     print(f"  labels shape: {batch['labels'].shape}")
